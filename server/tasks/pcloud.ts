@@ -9,7 +9,7 @@ import { rcloneLsf, rcloneRemoteBase, type RcloneListEntry } from '~/server/lib/
 // JSON line, derives `category` from the first path segment, and atomically
 // replaces the `pcloud_index` table.
 export default defineTask({
-  meta: { name: 'pcloud:index', description: 'Reindex pCloud via rclone lsf' },
+  meta: { name: 'pcloud', description: 'Reindex pCloud via rclone lsf' },
   async run(): Promise<{ result: { count: number; log: string[]; success: boolean } }> {
     const log: string[] = []
     try {

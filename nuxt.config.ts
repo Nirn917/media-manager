@@ -19,6 +19,8 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    // Nitro tasks are behind an experimental flag.
+    experimental: { tasks: true },
     // Long-running rclone jobs + SSE need generous timeout.
     timing: false,
     routeRules: {
@@ -26,7 +28,7 @@ export default defineNuxtConfig({
     },
     scheduledTasks: {
       // Hourly cron jobs, internal to Nitro (no external scheduler needed).
-      '0 * * * *': ['pcloud:index', 'jellyfin:index'],
+      '0 * * * *': ['pcloud', 'jellyfin'],
     },
   },
 

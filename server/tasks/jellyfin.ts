@@ -10,7 +10,7 @@ import { getAllSettings } from '~/server/lib/settings'
 // The UI reads this table to render the watched/partial/unwatched badge and
 // the "last played" timestamp on each media card.
 export default defineTask({
-  meta: { name: 'jellyfin:index', description: 'Reindex Jellyfin playback status' },
+  meta: { name: 'jellyfin', description: 'Reindex Jellyfin playback status' },
   async run(): Promise<{ result: { count: number; log: string[]; success: boolean } }> {
     const log: string[] = []
     try {
