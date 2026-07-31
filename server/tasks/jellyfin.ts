@@ -13,10 +13,13 @@ export default defineTask({
   meta: { name: 'jellyfin', description: 'Reindex Jellyfin playback status' },
   async run(): Promise<{ result: { count: number; log: string[]; success: boolean } }> {
     const log: string[] = []
+    const started = Date.now()
+    console.log('[cron] jellyfin:index started')
     try {
       const { jellyfin, admin } = await getAllSettings()
       if (!jellyfin?.url || !admin?.jellyfinUserId) {
         log.push('jellyfin not configured - skipping')
+        console.log('[cron] jellyfin:index skipped - not configured')
         return { result: { count: 0, log, success: false } }
       }
 
@@ -27,6 +30,7 @@ export default defineTask({
         token = auth.AccessToken
       } else {
         log.push('missing admin credentials - cannot index')
+        console.log('[cron] jellyfin:index skipped - missing credentials')
         return { result: { count: 0, log, success: false } }
       }
 
@@ -62,11 +66,15 @@ export default defineTask({
         throw err
       }
 
+      const elapsed = ((Date.now() - started) / 1000).toFixed(1)
       log.push(`indexed ${count} items`)
+      console.log(`[cron] jellyfin:index done - ${count} items in ${elapsed}s`)
       return { result: { count, log, success: true } }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      const elapsed = ((Date.now() - started) / 1000).toFixed(1)
       log.push(`failed: ${msg}`)
+      console.error(`[cron] jellyfin:index failed in ${elapsed}s - ${msg}`)
       return { result: { count: 0, log, success: false } }
     }
   },
