@@ -1,0 +1,133 @@
+name: build-and-publish
+
+# Builds the media-manager Docker image and publishes it to GHCR
+# (ghcr.io/nirn917/media-manager).
+#
+# Triggers:
+#   - push to ANY branch: tag :branch-<name> + :sha-<short>
+#   - push to default branch (main): + :latest
+#   - git tag v* : tag :vX.Y.Z + :X.Y + :X + :latest
+#   - PR: build-only (no push) to catch regressions
+#   - manual: dispatch with optional image-tag override
+#
+# Branch-tagged images (prefix: branch-) are cleaned up automatically by
+# .github/workflows/cleanup-branch-image.yml when the branch is deleted
+# (e.g. on PR merge with the "Delete branch" option). Branch tags never
+# receive :latest so main stays the source of truth.
+#
+# Auth: the default GITHUB_TOKEN is used for build + push (permissions:
+# packages: write) - no PAT needed for publish. Package deletion requires
+# a separate PAT secret (GHCR_DELETE_PAT) in the cleanup workflow.
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'nuxt.config.ts'
+      - 'tailwind.config.ts'
+      - 'components.json'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'app.vue'
+      - 'assets/**'
+      - 'components/**'
+      - 'composables/**'
+      - 'layouts/**'
+      - 'lib/**'
+      - 'middleware/**'
+      - 'pages/**'
+      - 'server/**'
+      - 'types/**'
+      - 'drizzle/**'
+      - '.github/workflows/build-and-publish.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/**'
+      - 'pages/**'
+      - 'components/**'
+      - 'composables/**'
+      - 'nuxt.config.ts'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag override (defaults to :branch-<name> + :sha)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+
+      - name: Resolve image name + branch tag
+        id: img
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER,,}" || echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          repo="$(echo "${GITHUB_REPOSITORY,,}" | cut -d/ -f2)"
+          echo "name=ghcr.io/${owner}/${repo}" >> "$GITHUB_OUTPUT"
+          # Branch push: tag as branch-<sanitized-name> where "/" is replaced by "-"
+          # (matches what docker/metadata-action produces below for cleanup parity).
+          if [ "${GITHUB_REF_TYPE}" = "branch" ]; then
+            safe="$(echo "${REF_NAME}" | tr '/' '-')"
+            echo "branch_tag=branch-${safe}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.img.outputs.name }}
+          tags: |
+            type=raw,value=${{ steps.img.outputs.branch_tag }},enable=${{ github.ref_type == 'branch' }}
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-
+            type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

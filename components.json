@@ -1,0 +1,6 @@
+{
+  "$schema": "https://shadcn-nuxt.com/schema.json",
+  "style": "default",
+  "typescript": true,
+  "registryRoot": "./components/ui"
+}

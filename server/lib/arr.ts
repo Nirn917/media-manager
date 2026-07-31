@@ -1,0 +1,143 @@
+// Radarr + Sonarr v3 REST clients (shared shape, differs only by root folder
+// filter and a couple of command payloads).
+
+type MediaType = 'movie' | 'series'
+
+export type ArrMediaItem = {
+  id: number
+  title: string
+  rootFolderPath: string
+  path?: string
+  size?: number
+  hasFile?: boolean
+  monitored?: boolean
+  images?: { coverType: string; remoteUrl: string; url: string }[]
+  // Sonarr-specific
+  seriesType?: 'standard' | 'anime' | 'daily'
+  // Sonarr statistics (series-level hasFile doesn't exist; use episodeFileCount)
+  statistics?: { episodeFileCount?: number; episodeCount?: number; sizeOnDisk?: number }
+  // Radarr-specific
+  movieFile?: { id?: number; path: string; size: number }
+}
+
+export type ArrInstance = {
+  url: string
+  apiKey: string
+  type: 'radarr' | 'sonarr'
+}
+
+function withKey(url: string, apiKey: string): string {
+  const u = new URL(url)
+  u.searchParams.set('apiKey', apiKey)
+  return u.toString()
+}
+
+async function arrFetch<T = unknown>(instance: ArrInstance, path: string, init: RequestInit = {}): Promise<T> {
+  const full = `${instance.url.replace(/\/$/, '')}${path}`
+  const url = path.includes('apiKey=') ? full : withKey(full, instance.apiKey)
+  const res = await fetch(url, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`${instance.type} ${path} failed (${res.status}): ${body}`)
+  }
+  if (res.status === 204) return undefined as T
+  const text = await res.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
+}
+
+export async function arrSystemStatus(instance: ArrInstance): Promise<{ appName?: string; version?: string }> {
+  return arrFetch(instance, '/api/v3/system/status')
+}
+
+export async function arrListMedia(instance: ArrInstance): Promise<ArrMediaItem[]> {
+  const path = instance.type === 'radarr' ? '/api/v3/movie' : '/api/v3/series'
+  return arrFetch<ArrMediaItem[]>(instance, path)
+}
+
+export async function arrGetMedia(instance: ArrInstance, id: number): Promise<ArrMediaItem> {
+  const path = instance.type === 'radarr' ? `/api/v3/movie/${id}` : `/api/v3/series/${id}`
+  return arrFetch<ArrMediaItem>(instance, path)
+}
+
+export async function arrDeleteMedia(
+  instance: ArrInstance,
+  id: number,
+  opts: { deleteFiles?: boolean; addImportExclusion?: boolean } = {},
+): Promise<void> {
+  const path = instance.type === 'radarr' ? `/api/v3/movie/${id}` : `/api/v3/series/${id}`
+  const params = new URLSearchParams()
+  if (opts.deleteFiles ?? true) params.set('deleteFiles', 'true')
+  if (opts.addImportExclusion !== undefined) params.set('addImportExclusion', String(opts.addImportExclusion))
+  await arrFetch(instance, `${path}?${params.toString()}`, { method: 'DELETE' })
+}
+
+// Delete only the file(s), keeping the movie/series entry in the *arr DB.
+// This is the correct Archive behavior: the media stays in the list with
+// hasFile=false so the user can Restore it later.
+// Also unmonitors the media so *arr doesn't re-download it automatically.
+export async function arrDeleteFiles(instance: ArrInstance, mediaId: number): Promise<void> {
+  // Unmonitor first so *arr doesn't trigger a search after the file is gone.
+  // Uses GET-modify-PUT because Radarr/Sonarr require the full object.
+  await arrUnmonitor(instance, mediaId)
+
+  if (instance.type === 'radarr') {
+    // Radarr: delete the single movieFile by its id.
+    const movie = await arrGetMedia(instance, mediaId)
+    if (!movie.movieFile?.id) return // already no file
+    await arrFetch(instance, `/api/v3/movieFile/${movie.movieFile.id}`, { method: 'DELETE' })
+  } else {
+    // Sonarr: delete all episode files for the series.
+    const files = await arrFetch<{ id: number }[]>(instance, `/api/v3/episodeFile?seriesId=${mediaId}`)
+    for (const f of files) {
+      await arrFetch(instance, `/api/v3/episodeFile/${f.id}`, { method: 'DELETE' })
+    }
+  }
+}
+
+// Re-monitor a movie/series (called after Restore so *arr tracks it again).
+// Radarr/Sonarr PUT requires the full object — a partial body resets other
+// fields to defaults. So we GET the current object, flip monitored, PUT back.
+export async function arrMonitor(instance: ArrInstance, mediaId: number, monitored: boolean): Promise<void> {
+  const item = await arrGetMedia(instance, mediaId)
+  await arrFetch(instance, instance.type === 'radarr' ? `/api/v3/movie/${mediaId}` : `/api/v3/series/${mediaId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...item, monitored }),
+  })
+}
+
+// Unmonitor using the same GET-modify-PUT pattern.
+export async function arrUnmonitor(instance: ArrInstance, mediaId: number): Promise<void> {
+  await arrMonitor(instance, mediaId, false)
+}
+
+export async function arrRefresh(instance: ArrInstance, mediaId: number): Promise<void> {
+  // RefreshMovie/RefreshSeries updates metadata from the indexer AND rescans
+  // the disk for existing files — this is what makes *arr pick up a restored file.
+  const name = instance.type === 'radarr' ? 'RefreshMovie' : 'RefreshSeries'
+  const idKey = instance.type === 'radarr' ? 'movieId' : 'seriesId'
+  await arrFetch(instance, '/api/v3/command', {
+    method: 'POST',
+    body: JSON.stringify({ name, [idKey]: mediaId }),
+  })
+}
+
+export async function arrRescanMovieFiles(instance: ArrInstance): Promise<void> {
+  // "RescanMovieFolders" makes *arr look at the disk and pick up newly restored files.
+  const name = instance.type === 'radarr' ? 'RescanMovieFolders' : 'RescanSeriesFolders'
+  await arrFetch(instance, '/api/v3/command', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+// Resolve the configured root folder for a category.
+export const ROOT_FOLDER = {
+  movies: '/data/movies',
+  series: '/data/series',
+  anime: '/data/anime',
+} as const
+
+export function filterByRootFolder(items: ArrMediaItem[], rootFolder: string): ArrMediaItem[] {
+  return items.filter((m) => (m.rootFolderPath || '').replace(/\/$/, '') === rootFolder.replace(/\/$/, ''))
+}

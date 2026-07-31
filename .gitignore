@@ -141,3 +141,17 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+
+k8s-manifests/*
+
+# k8s manifests contain generated secrets (APP_MASTER_KEY) - do not track
+k8s/
+
+# app data + sqlite
+/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+SECURITY_AUDIT.md
