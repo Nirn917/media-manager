@@ -106,7 +106,7 @@ export default defineEventHandler(async (event) => {
         ? !!item.hasFile || (item.movieFile !== undefined)
         : !!(item.statistics?.episodeFileCount && item.statistics.episodeFileCount > 0),
       monitored: !!item.monitored,
-      posterUrl: item.images?.find((i) => i.coverType === 'poster')?.url ?? null,
+      posterUrl: item.images?.find((i) => i.coverType === 'poster')?.remoteUrl ?? null,
       arrType,
       watched,
       backedUp: {
