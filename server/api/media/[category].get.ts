@@ -64,13 +64,25 @@ export default defineEventHandler(async (event) => {
     pcloudByDir.set(r.path, true) // also exact file path
   }
   const jellyRows = await db.select().from(jellyfinIndex).all()
+  // Jellyfin stores file-level paths for movies (/data/movies/Title/Title.mkv)
+  // and directory-level for series (/data/series/Title). Build a lookup by
+  // both the exact path and the directory (filename stripped) so we can
+  // match against arr directory paths.
   const jellyByPath = new Map(jellyRows.map((r) => [r.path, r]))
+  const jellyByDir = new Map<string, typeof jellyRows[number]>()
+  for (const r of jellyRows) {
+    const dir = r.path.replace(/\/[^/]+$/, '')
+    // For movie files (/data/movies/Title/Title.mkv) the directory is
+    // /data/movies/Title which matches Radarr's path.
+    // For series (/data/series/Title) there's no filename to strip, so
+    // the dir equals the path — skip to avoid overwriting real matches.
+    if (dir !== r.path) jellyByDir.set(dir, r)
+  }
 
   const rows: MediaRow[] = all.map(({ item, arrType }) => {
     const localPath = item.path || item.movieFile?.path || ''
-    // Jellyfin stores paths like /data/movies/Title/Title.mkv - same as the
-    // arr library path on this box (single mount).
-    const jelly = jellyByPath.get(localPath)
+    // Try exact match first (series), then directory match (movies).
+    const jelly = jellyByPath.get(localPath) ?? jellyByDir.get(localPath)
     const stripped = localPath.replace(/^\/data\//, '')
     // Match against both the directory path and the full file path.
     const pcloudExists = pcloudByDir.has(stripped)
