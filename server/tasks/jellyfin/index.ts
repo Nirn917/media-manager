@@ -1,5 +1,5 @@
 import { useSqlite } from '~/server/db'
-import { jellyfinStreamItems, jellyfinWebUrl, jellyfinAuthenticate, type JellyfinIndexedItem } from '~/server/lib/jellyfin'
+import { jellyfinStreamItems, jellyfinWebUrl, jellyfinAuthenticate } from '~/server/lib/jellyfin'
 import { getAllSettings } from '~/server/lib/settings'
 
 // Nitro scheduled task: `jellyfin:index`.
@@ -24,7 +24,7 @@ export default defineTask({
       let token = ''
       if (jellyfin.adminUsername && jellyfin.adminPassword) {
         const auth = await jellyfinAuthenticate(jellyfin.url, jellyfin.adminUsername, jellyfin.adminPassword)
-        token = auth.accessToken
+        token = auth.AccessToken
       } else {
         log.push('missing admin credentials - cannot index')
         return { result: { count: 0, log, success: false } }
@@ -32,16 +32,16 @@ export default defineTask({
 
       const rows: { path: string; item_id: string; title: string; played: number; last_played: string; jellyfin_url: string }[] = []
       for await (const item of jellyfinStreamItems(jellyfin.url, admin.jellyfinUserId, token, { includeItemTypes: 'Movie,Series' })) {
-        const p = (item as JellyfinIndexedItem).path
+        const p = item.Path
         if (!p) continue
-        const ud = (item as JellyfinIndexedItem).userData
+        const ud = item.UserData
         rows.push({
           path: p,
-          item_id: (item as JellyfinIndexedItem).id,
-          title: (item as JellyfinIndexedItem).name,
-          played: ud?.played ? 1 : 0,
-          last_played: ud?.lastPlayedDate ?? '',
-          jellyfin_url: jellyfinWebUrl(jellyfin.url, (item as JellyfinIndexedItem).id),
+          item_id: item.Id,
+          title: item.Name,
+          played: ud?.Played ? 1 : 0,
+          last_played: ud?.LastPlayedDate ?? '',
+          jellyfin_url: jellyfinWebUrl(jellyfin.url, item.Id),
         })
       }
 

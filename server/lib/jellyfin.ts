@@ -23,15 +23,15 @@ export function jellyfinAuthHeader(token?: string): string {
 }
 
 export type JellyfinUser = {
-  id: string
-  name: string
-  policy?: { isAdministrator?: boolean }
+  Id: string
+  Name: string
+  Policy?: { IsAdministrator?: boolean }
 }
 
 export type JellyfinAuthResult = {
-  user: JellyfinUser
-  sessionInfo?: unknown
-  accessToken: string
+  User: JellyfinUser
+  SessionInfo?: unknown
+  AccessToken: string
 }
 
 export async function jellyfinAuthenticate(
@@ -97,10 +97,10 @@ export async function* jellyfinStreamItems(
 }
 
 export type JellyfinIndexedItem = {
-  id: string
-  name: string
-  path?: string
-  userData?: { played?: boolean; lastPlayedDate?: string; playbackPositionTicks?: number; runTimeTicks?: number }
+  Id: string
+  Name: string
+  Path?: string
+  UserData?: { Played?: boolean; LastPlayedDate?: string; PlaybackPositionTicks?: number; RunTimeTicks?: number }
 }
 
 // Build a deep link to the Jellyfin web client.

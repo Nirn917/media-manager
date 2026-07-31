@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
   if (!adminUserId) {
     try {
       const auth = await jellyfinAuthenticate(j.url!.replace(/\/$/, ''), j.adminUsername!, j.adminPassword!)
-      adminUserId = auth.user.id
+      adminUserId = auth.User.Id
     } catch (err) {
       throw createError({
         statusCode: 400,

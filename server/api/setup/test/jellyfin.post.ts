@@ -17,9 +17,9 @@ export default defineEventHandler(async (event) => {
     // List users so the wizard can pick the Jellyfin admin (used for the index cron).
     let users: { id: string; name: string }[] = []
     try {
-      users = (await jellyfinListUsers(url, auth.accessToken)).map((u) => ({ id: u.id, name: u.name }))
+      users = (await jellyfinListUsers(url, auth.AccessToken)).map((u) => ({ id: u.Id, name: u.Name }))
     } catch { /* non-fatal - the wizard can still save */ }
-    return { ok: true, adminUserId: auth.user.id, adminUsername: auth.user.name, users }
+    return { ok: true, adminUserId: auth.User.Id, adminUsername: auth.User.Name, users }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
