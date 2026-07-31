@@ -3,18 +3,28 @@
 
 type Me = { authed: boolean; user?: { id: string; name: string; isAdmin: boolean } }
 
-const me = useState<Me>('mm-me', () => ({ authed: false }))
-let hydrated = false
+// useState must be called inside a Nuxt-context function (setup, composable,
+// plugin). Calling it at module scope crashes SSR with "instance unavailable".
+// We lazily resolve it via useNuxtApp() inside each composable so the state
+// is created on first use within a valid Nuxt context (and shared via the
+// `nuxt-app` payload key across server + client).
+
+const STATE_KEY = 'mm-me'
+
+function useMe() {
+  return useState<Me>(STATE_KEY, () => ({ authed: false }))
+}
 
 export function useAuthState() {
-  return computed(() => me.value.authed)
+  return computed(() => useMe().value.authed)
 }
 
 export function useAuthUser() {
-  return computed(() => me.value.user)
+  return computed(() => useMe().value.user)
 }
 
 export function useAuth() {
+  const me = useMe()
   return {
     async login(username: string, password: string) {
       const res = await $fetch<Me & { ok?: boolean }>('/api/auth/login', { method: 'POST', body: { username, password } })
@@ -30,16 +40,5 @@ export function useAuth() {
       me.value = res
       return res
     },
-  }
-}
-
-// Called from app.vue / a plugin on first render so `me` is populated.
-export async function hydrateAuth() {
-  if (hydrated) return
-  hydrated = true
-  try {
-    await useAuth().refresh()
-  } catch {
-    // ignore network/SSR hiccups
   }
 }

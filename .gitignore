@@ -154,3 +154,4 @@ k8s/
 *.db-journal
 *.db-wal
 *.db-shm
+SECURITY_AUDIT.md
