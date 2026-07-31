@@ -8,14 +8,18 @@ const CLIENT = 'media-manager'
 const VERSION = '0.1.0'
 
 export function jellyfinAuthHeader(token?: string): string {
-  const params = new URLSearchParams({
-    Client: CLIENT,
-    Device: 'VPS pod',
-    DeviceId: DEVICE_ID,
-    Version: VERSION,
-  })
-  if (token) params.set('Token', token)
-  return `MediaBrowser ${params.toString()}`
+  // Jellyfin/Emby expects the Emby authorization format:
+  //   MediaBrowser Client="...", Device="...", DeviceId="...", Version="..."[, Token="..."]
+  // Quoted, comma-separated — NOT URL-encoded params (URLSearchParams produces
+  // & separators and + for spaces which Jellyfin rejects with a 400).
+  const parts = [
+    `Client="${CLIENT}"`,
+    `Device="VPS pod"`,
+    `DeviceId="${DEVICE_ID}"`,
+    `Version="${VERSION}"`,
+  ]
+  if (token) parts.push(`Token="${token}"`)
+  return `MediaBrowser ${parts.join(', ')}`
 }
 
 export type JellyfinUser = {

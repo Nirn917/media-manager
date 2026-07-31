@@ -26,7 +26,7 @@ async function load() {
     const res = await $fetch<{ jobs: Job[] }>('/api/jobs')
     jobs.value = res.jobs
   } catch (e) {
-    message.value = e instanceof Error ? e.message : 'failed to load'
+    message.value = extractFetchError(e)
   } finally {
     loading.value = false
   }
@@ -39,7 +39,7 @@ async function retry(job: Job) {
     message.value = 'Replay the action from the Movies/Series/Anime tab to retry.'
     await load()
   } catch (e) {
-    message.value = e instanceof Error ? e.message : 'retry failed'
+    message.value = extractFetchError(e)
   }
 }
 

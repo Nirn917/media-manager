@@ -14,7 +14,7 @@ export function useMediaList(category: Category) {
       const res = await $fetch<{ rows: MediaRow[] }>('/api/media/'+category)
       rows.value = res.rows
     } catch (e) {
-      error.value = e instanceof Error ? e.message : String(e)
+      error.value = extractFetchError(e)
     } finally {
       loading.value = false
     }

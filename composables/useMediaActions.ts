@@ -1,3 +1,4 @@
+import { extractFetchError } from '~/composables/extractFetchError'
 import type { MediaRow } from '~/types/media'
 
 const confirmText = 'supprimer'
@@ -22,7 +23,7 @@ export function useMediaActions(category: 'movies' | 'series' | 'anime', reload:
       // Navigate to jobs view so the SSE progress is visible.
       await navigateTo('/jobs')
     } catch (e) {
-      message.value = `Restore failed: ${e instanceof Error ? e.message : String(e)}`
+      message.value = `Restore failed: ${extractFetchError(e)}`
     } finally {
       delete busy.value[row.id]
     }
@@ -50,7 +51,7 @@ export function useMediaActions(category: 'movies' | 'series' | 'anime', reload:
       closeDialog()
       await reload()
     } catch (e) {
-      message.value = `Archive failed: ${e instanceof Error ? e.message : String(e)}`
+      message.value = `Archive failed: ${extractFetchError(e)}`
     } finally {
       delete busy.value[row.id]
     }
@@ -73,7 +74,7 @@ export function useMediaActions(category: 'movies' | 'series' | 'anime', reload:
       closeDialog()
       await reload()
     } catch (e) {
-      message.value = `Delete failed: ${e instanceof Error ? e.message : String(e)}`
+      message.value = `Delete failed: ${extractFetchError(e)}`
     } finally {
       delete busy.value[row.id]
     }

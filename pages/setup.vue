@@ -29,7 +29,7 @@ async function testJellyfin() {
     testResult.value = res
     if (res.ok && res.adminUserId && !jellyfin.adminUserId) jellyfin.adminUserId = res.adminUserId
   } catch (e) {
-    testResult.value = { ok: false, error: e instanceof Error ? e.message : String(e) }
+    testResult.value = { ok: false, error: extractFetchError(e) }
   } finally {
     testing.value = false
   }
@@ -44,7 +44,7 @@ async function testArr() {
     const res = await $fetch<{ ok: boolean; error?: string }>(`/api/setup/test/${service}`, { method: 'POST', body })
     testResult.value = res
   } catch (e) {
-    testResult.value = { ok: false, error: e instanceof Error ? e.message : String(e) }
+    testResult.value = { ok: false, error: extractFetchError(e) }
   } finally {
     testing.value = false
   }
@@ -73,8 +73,8 @@ async function save() {
       },
     })
     finished.value = true
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
+  } catch (e: unknown) {
+    error.value = extractFetchError(e)
   } finally {
     saving.value = false
   }

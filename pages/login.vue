@@ -3,6 +3,7 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { useAuth } from '~/composables/useAuth'
+import { extractFetchError } from '~/composables/extractFetchError'
 
 definePageMeta({ layout: 'blank' })
 useHead({ title: 'Login — media-manager' })
@@ -21,7 +22,7 @@ async function submit() {
     await login(username.value.trim(), password.value)
     await router.push('/movies')
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Login failed'
+    error.value = extractFetchError(e)
   } finally {
     loading.value = false
   }

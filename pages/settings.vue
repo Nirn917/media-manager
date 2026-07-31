@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { useAuthUser } from '~/composables/useAuth'
+import { extractFetchError } from '~/composables/extractFetchError'
 
 definePageMeta({ middleware: ['admin'] })
 useHead({ title: 'Settings — media-manager' })
@@ -35,7 +36,7 @@ async function load() {
     if (res.radarr) { radarr.url = res.radarr.url; radarr.apiKey = res.radarr.apiKey }
     if (res.sonarr) { sonarr.url = res.sonarr.url; sonarr.apiKey = res.sonarr.apiKey }
   } catch (e) {
-    message.value = e instanceof Error ? e.message : 'failed to load'
+    message.value = extractFetchError(e)
   }
 }
 
@@ -60,7 +61,7 @@ async function save() {
     message.value = 'Saved.'
     await load()
   } catch (e) {
-    message.value = e instanceof Error ? e.message : 'save failed'
+    message.value = extractFetchError(e)
   } finally {
     saving.value = false
   }
@@ -75,7 +76,7 @@ async function resync() {
       ? `pCloud reindex: ${res.result?.count ?? 0} entries`
       : `pCloud reindex failed${tail ? `: ${tail}` : ''}`
   } catch (e) {
-    message.value = e instanceof Error ? e.message : 'resync failed'
+    message.value = extractFetchError(e)
   }
 }
 
