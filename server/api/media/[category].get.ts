@@ -53,7 +53,16 @@ export default defineEventHandler(async (event) => {
 
   // Load indexes keyed by path for O(1) join.
   const pcloudRows = await db.select().from(pcloudIndex).all()
-  const pcloudByPath = new Map(pcloudRows.map((r) => [r.path, r]))
+  // Index by the first path segment + directory so we can match a media
+  // directory (e.g. "movies/The Dark Knight (2008)") against any pCloud
+  // file inside it (e.g. "movies/The Dark Knight (2008)/movie.mkv").
+  // Also keep an exact-path map for file-level matches.
+  const pcloudByDir = new Map<string, boolean>()
+  for (const r of pcloudRows) {
+    const dir = r.path.replace(/\/[^/]+$/, '') // strip the filename
+    pcloudByDir.set(dir, true)
+    pcloudByDir.set(r.path, true) // also exact file path
+  }
   const jellyRows = await db.select().from(jellyfinIndex).all()
   const jellyByPath = new Map(jellyRows.map((r) => [r.path, r]))
 
@@ -62,7 +71,9 @@ export default defineEventHandler(async (event) => {
     // Jellyfin stores paths like /data/movies/Title/Title.mkv - same as the
     // arr library path on this box (single mount).
     const jelly = jellyByPath.get(localPath)
-    const pcloud = pcloudByPath.get(localPath.replace(/^\/data\//, ''))
+    const stripped = localPath.replace(/^\/data\//, '')
+    // Match against both the directory path and the full file path.
+    const pcloudExists = pcloudByDir.has(stripped)
 
     let watched: MediaRow['watched'] = { state: 'unknown', lastPlayed: null, jellyfinUrl: null }
     if (jelly) {
@@ -85,9 +96,9 @@ export default defineEventHandler(async (event) => {
       arrType,
       watched,
       backedUp: {
-        exists: !!pcloud,
-        hash: pcloud?.hash ?? null,
-        modtime: pcloud?.modtime ?? null,
+        exists: pcloudExists,
+        hash: null,
+        modtime: null,
       },
     }
   })
