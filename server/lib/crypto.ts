@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
 // AES-256-GCM key derived from APP_MASTER_KEY (base64 of 32 random bytes,
 // so the raw key is exactly 32 bytes after base64 decode).
@@ -51,16 +51,8 @@ export function verify(signed: string): string | null {
   const expected = createHmac('sha256', masterKey()).update(value).digest('base64url')
   // Constant-time compare.
   if (mac.length !== expected.length) return null
-  if (!cryptoSafeEqual(Buffer.from(mac), Buffer.from(expected))) return null
+  if (!timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) return null
   return value
-}
-
-function cryptoSafeEqual(a: Buffer, b: Buffer): boolean {
-  if (a.length !== b.length) return false
-  // node:crypto timingSafeEqual
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { timingSafeEqual } = require('node:crypto')
-  return timingSafeEqual(a, b)
 }
 
 // Convenience: encrypt + decrypt an arbitrary JSON object (used for settings rows).
