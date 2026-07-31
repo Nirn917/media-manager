@@ -63,9 +63,9 @@ export default defineEventHandler(async (event) => {
       child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`rclone deletefile exit ${code}: ${stderr}`))))
     })
 
-    // Drop the row from pcloud_index so the UI shows the file as unbacked-up.
+    // Drop all pCloud index rows for this media (directory + files inside it).
     const sqlite = useSqlite()
-    sqlite.prepare(`DELETE FROM pcloud_index WHERE path=?`).run(stripped)
+    sqlite.prepare(`DELETE FROM pcloud_index WHERE path = ? OR path LIKE ? || '/%'`).run(stripped, stripped)
 
     finishJob(jobId, 'done')
     return { ok: true, jobId, message: `Deleted "${item.title}" everywhere (local + pCloud backup)` }

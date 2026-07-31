@@ -21,8 +21,12 @@ export default defineEventHandler(async (event) => {
   const { item, inst, localPath, stripped } = await resolveArrMedia(event, category, mediaId)
 
   // Safety check: verify the backup is present in the pcloud_index.
+  // Radarr/Sonarr return directory paths (e.g. movies/Title) but pCloud
+  // index stores file paths (e.g. movies/Title/file.mkv). Match by prefix.
   const sqlite = useSqlite()
-  const backupRow = sqlite.prepare(`SELECT path, hash FROM pcloud_index WHERE path=?`).get(stripped) as { path: string; hash: string | null } | undefined
+  const backupRow = sqlite.prepare(
+    `SELECT path FROM pcloud_index WHERE path = ? OR path LIKE ? || '/%' LIMIT 1`,
+  ).get(stripped, stripped) as { path: string } | undefined
   if (!backupRow) {
     throw createError({ statusCode: 409, statusMessage: 'Backup not verified - run a pCloud resync first' })
   }
