@@ -17,7 +17,7 @@ export type ArrMediaItem = {
   // Sonarr statistics (series-level hasFile doesn't exist; use episodeFileCount)
   statistics?: { episodeFileCount?: number; episodeCount?: number; sizeOnDisk?: number }
   // Radarr-specific
-  movieFile?: { path: string; size: number }
+  movieFile?: { id?: number; path: string; size: number }
 }
 
 export type ArrInstance = {
@@ -71,6 +71,24 @@ export async function arrDeleteMedia(
   if (opts.deleteFiles ?? true) params.set('deleteFiles', 'true')
   if (opts.addImportExclusion !== undefined) params.set('addImportExclusion', String(opts.addImportExclusion))
   await arrFetch(instance, `${path}?${params.toString()}`, { method: 'DELETE' })
+}
+
+// Delete only the file(s), keeping the movie/series entry in the *arr DB.
+// This is the correct Archive behavior: the media stays in the list with
+// hasFile=false so the user can Restore it later.
+export async function arrDeleteFiles(instance: ArrInstance, mediaId: number): Promise<void> {
+  if (instance.type === 'radarr') {
+    // Radarr: delete the single movieFile by its id.
+    const movie = await arrGetMedia(instance, mediaId)
+    if (!movie.movieFile?.id) return // already no file
+    await arrFetch(instance, `/api/v3/movieFile/${movie.movieFile.id}`, { method: 'DELETE' })
+  } else {
+    // Sonarr: delete all episode files for the series.
+    const files = await arrFetch<{ id: number }[]>(instance, `/api/v3/episodeFile?seriesId=${mediaId}`)
+    for (const f of files) {
+      await arrFetch(instance, `/api/v3/episodeFile/${f.id}`, { method: 'DELETE' })
+    }
+  }
 }
 
 export async function arrRefresh(instance: ArrInstance, mediaId: number): Promise<void> {
