@@ -14,6 +14,8 @@ export type ArrMediaItem = {
   images?: { coverType: string; remoteUrl: string; url: string }[]
   // Sonarr-specific
   seriesType?: 'standard' | 'anime' | 'daily'
+  // Sonarr statistics (series-level hasFile doesn't exist; use episodeFileCount)
+  statistics?: { episodeFileCount?: number; episodeCount?: number; sizeOnDisk?: number }
   // Radarr-specific
   movieFile?: { path: string; size: number }
 }

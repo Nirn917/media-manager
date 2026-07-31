@@ -89,8 +89,10 @@ export default defineEventHandler(async (event) => {
       id: item.id,
       title: item.title,
       path: localPath,
-      size: item.movieFile?.size ?? item.size ?? null,
-      hasFile: !!item.hasFile || (item.movieFile !== undefined),
+      size: item.movieFile?.size ?? item.statistics?.sizeOnDisk ?? item.size ?? null,
+      hasFile: arrType === 'radarr'
+        ? !!item.hasFile || (item.movieFile !== undefined)
+        : !!(item.statistics?.episodeFileCount && item.statistics.episodeFileCount > 0),
       monitored: !!item.monitored,
       posterUrl: item.images?.find((i) => i.coverType === 'poster')?.url ?? null,
       arrType,
