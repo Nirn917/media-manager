@@ -1,23 +1,13 @@
 import { readSession } from '~/server/lib/auth'
-import { jellyfinUsersMe } from '~/server/lib/jellyfin'
-import { getAllSettings } from '~/server/lib/settings'
 
 // GET /api/auth/me -> { authed: bool, user?: {...}, isAdmin?: bool }
-// Validates the cookie by re-checking the Jellyfin token (server-side only).
-// To lighten the load the validation is only performed on demand (this route);
-// regular API calls trust the signed cookie signature instead.
-export default defineEventHandler(async (event) => {
+// Trusts the HMAC-signed cookie — does NOT re-validate against Jellyfin on
+// every call. The cookie signature already proves it wasn't tampered. If the
+// Jellyfin token inside expires, API calls that use it will 401 and the
+// frontend can handle that (redirect to /login).
+export default defineEventHandler((event) => {
   const session = readSession(event)
   if (!session) return { authed: false }
-  try {
-    const { jellyfin } = await getAllSettings()
-    if (jellyfin?.url) {
-      await jellyfinUsersMe(jellyfin.url, session.token)
-    }
-  } catch {
-    // Token expired / revoked -> treat as logged out.
-    return { authed: false }
-  }
   return {
     authed: true,
     user: { id: session.userId, name: session.username, isAdmin: session.isAdmin },

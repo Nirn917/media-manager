@@ -3,11 +3,13 @@
 //   unauthed -> /login
 //   /login   -> /movies (if already authed)
 //
-// On the server we read the session cookie directly (no need for a round-trip
-// to /api/auth/me per request). On the client we hydrate from /api/auth/me
-// once, then trust the reactive state.
+// On the server we read the session cookie directly. On the client we
+// hydrate the auth state once on first load, then trust the reactive state
+// for subsequent navigations (no per-navigation round-trip).
 
 import { useAuth, useAuthState } from '~/composables/useAuth'
+
+let clientHydrated = false
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path.startsWith('/api/') || to.path.startsWith('/_')) return
@@ -22,16 +24,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
   }
 
-  // Always allow /setup and /login through to avoid redirect loops.
+  // Always allow /setup through to avoid redirect loops.
   if (to.path === '/setup') return
 
   // Determine auth state.
   if (process.server) {
-    // On the server, read the signed cookie directly from the request.
     const cookie = useCookie('mm_session').value
-    // The cookie is HMAC-signed; if it exists and is non-empty we treat the
-    // user as authed. The 01-auth server middleware does the real signature
-    // verification on API calls — here we just need to decide the redirect.
     if (!cookie && to.path !== '/login') {
       return navigateTo('/login', { replace: true })
     }
@@ -41,8 +39,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return
   }
 
-  // Client: hydrate the auth state once, then trust the reactive state.
-  if (process.client) {
+  // Client: hydrate once on first navigation, then trust the reactive state.
+  if (process.client && !clientHydrated) {
+    clientHydrated = true
     const { refresh } = useAuth()
     await refresh().catch(() => {})
   }
