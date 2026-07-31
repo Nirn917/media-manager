@@ -44,7 +44,9 @@ async function arrFetch<T = unknown>(instance: ArrInstance, path: string, init: 
     throw new Error(`${instance.type} ${path} failed (${res.status}): ${body}`)
   }
   if (res.status === 204) return undefined as T
-  return (await res.json()) as T
+  const text = await res.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 export async function arrSystemStatus(instance: ArrInstance): Promise<{ appName?: string; version?: string }> {
