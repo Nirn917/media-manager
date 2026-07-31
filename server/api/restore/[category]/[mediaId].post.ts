@@ -43,7 +43,7 @@ function startRestoreJob(
         const inst: ArrInstance = meta.arrType === 'radarr'
           ? { ...radarr!, type: 'radarr' }
           : { ...sonarr!, type: 'sonarr' }
-        await arrMonitor(inst, meta.mediaId)
+        await arrMonitor(inst, meta.mediaId, true)
         await arrRefresh(inst, meta.mediaId)
       } catch (err) {
         // eslint-disable-next-line no-console

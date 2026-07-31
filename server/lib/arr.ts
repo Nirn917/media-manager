@@ -81,11 +81,8 @@ export async function arrDeleteMedia(
 // Also unmonitors the media so *arr doesn't re-download it automatically.
 export async function arrDeleteFiles(instance: ArrInstance, mediaId: number): Promise<void> {
   // Unmonitor first so *arr doesn't trigger a search after the file is gone.
-  const path = instance.type === 'radarr' ? `/api/v3/movie/${mediaId}` : `/api/v3/series/${mediaId}`
-  await arrFetch(instance, path, {
-    method: 'PUT',
-    body: JSON.stringify({ monitored: false }),
-  })
+  // Uses GET-modify-PUT because Radarr/Sonarr require the full object.
+  await arrUnmonitor(instance, mediaId)
 
   if (instance.type === 'radarr') {
     // Radarr: delete the single movieFile by its id.
@@ -102,15 +99,24 @@ export async function arrDeleteFiles(instance: ArrInstance, mediaId: number): Pr
 }
 
 // Re-monitor a movie/series (called after Restore so *arr tracks it again).
-export async function arrMonitor(instance: ArrInstance, mediaId: number): Promise<void> {
-  const path = instance.type === 'radarr' ? `/api/v3/movie/${mediaId}` : `/api/v3/series/${mediaId}`
-  await arrFetch(instance, path, {
+// Radarr/Sonarr PUT requires the full object — a partial body resets other
+// fields to defaults. So we GET the current object, flip monitored, PUT back.
+export async function arrMonitor(instance: ArrInstance, mediaId: number, monitored: boolean): Promise<void> {
+  const item = await arrGetMedia(instance, mediaId)
+  await arrFetch(instance, instance.type === 'radarr' ? `/api/v3/movie/${mediaId}` : `/api/v3/series/${mediaId}`, {
     method: 'PUT',
-    body: JSON.stringify({ monitored: true }),
+    body: JSON.stringify({ ...item, monitored }),
   })
 }
 
+// Unmonitor using the same GET-modify-PUT pattern.
+export async function arrUnmonitor(instance: ArrInstance, mediaId: number): Promise<void> {
+  await arrMonitor(instance, mediaId, false)
+}
+
 export async function arrRefresh(instance: ArrInstance, mediaId: number): Promise<void> {
+  // RefreshMovie/RefreshSeries updates metadata from the indexer AND rescans
+  // the disk for existing files — this is what makes *arr pick up a restored file.
   const name = instance.type === 'radarr' ? 'RefreshMovie' : 'RefreshSeries'
   const idKey = instance.type === 'radarr' ? 'movieId' : 'seriesId'
   await arrFetch(instance, '/api/v3/command', {
