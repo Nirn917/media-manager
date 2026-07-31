@@ -13,18 +13,18 @@ export default defineTask({
   async run(): Promise<{ result: { count: number; log: string[]; success: boolean } }> {
     const log: string[] = []
     try {
-      log.push('running rclone lsf…')
+      log.push('running rclone lsjson…')
       const entries = await rcloneLsf(rcloneRemoteBase())
       const rows = entries
-        .filter((e: RcloneListEntry) => e.path && !e.isDir)
+        .filter((e: RcloneListEntry) => e.Path && !e.IsDir)
         .map((e: RcloneListEntry) => {
-          const p = e.path as string
+          const p = e.Path as string
           const category = (p.split('/')[0] || 'movies') as 'movies' | 'series' | 'anime'
           return {
             path: p,
-            size: e.size ?? 0,
-            modtime: e.modtime ?? null,
-            hash: e.hash ?? null,
+            size: e.Size ?? 0,
+            modtime: e.ModTime ?? null,
+            hash: e.Hash ?? null,
             category,
           }
         })

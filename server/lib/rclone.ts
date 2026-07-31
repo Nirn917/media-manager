@@ -20,19 +20,21 @@ function baseArgs(extra: string[]): string[] {
 }
 
 export type RcloneListEntry = {
-  path?: string
-  name?: string
-  isDir?: boolean
-  size?: number
-  modtime?: string
-  hash?: string
+  Path?: string
+  Name?: string
+  IsDir?: boolean
+  Size?: number
+  ModTime?: string
+  Hash?: string
   IDs?: string
 }
 
-// `rclone lsf pcloud:media --recursive --json --checksum`
-// Streams JSON objects (one per line). Resolve to a full array.
+// `rclone lsjson pcloud:media --recursive --hash`
+// Outputs a single JSON array of objects with Path, Name, IsDir, Size,
+// ModTime, Hash. This is the portable way to get structured output with
+// hashes — `lsf --json --checksum` is not available on older rclone builds.
 export async function rcloneLsf(remoteRoot = 'pcloud:media'): Promise<RcloneListEntry[]> {
-  const args = baseArgs(['lsf', remoteRoot, '--recursive', '--json', '--checksum'])
+  const args = baseArgs(['lsjson', remoteRoot, '--recursive', '--hash'])
   return new Promise((resolve, reject) => {
     const proc = spawn('rclone', args)
     let stdout = ''
@@ -41,15 +43,13 @@ export async function rcloneLsf(remoteRoot = 'pcloud:media'): Promise<RcloneList
     proc.stderr.on('data', (d) => (stderr += d.toString()))
     proc.on('error', reject)
     proc.on('close', (code) => {
-      if (code !== 0) return reject(new Error(`rclone lsf exit ${code}: ${stderr}`))
-      const out: RcloneListEntry[] = []
-      for (const line of stdout.split('\n')) {
-        const t = line.trim()
-        if (!t) continue
-        try { out.push(JSON.parse(t) as RcloneListEntry) }
-        catch { /* skip non-JSON log preamble */ }
+      if (code !== 0) return reject(new Error(`rclone lsjson exit ${code}: ${stderr}`))
+      try {
+        const parsed = JSON.parse(stdout)
+        resolve(Array.isArray(parsed) ? parsed : [])
+      } catch (err) {
+        reject(new Error(`rclone lsjson parse error: ${err}`))
       }
-      resolve(out)
     })
   })
 }
