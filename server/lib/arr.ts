@@ -78,7 +78,15 @@ export async function arrDeleteMedia(
 // Delete only the file(s), keeping the movie/series entry in the *arr DB.
 // This is the correct Archive behavior: the media stays in the list with
 // hasFile=false so the user can Restore it later.
+// Also unmonitors the media so *arr doesn't re-download it automatically.
 export async function arrDeleteFiles(instance: ArrInstance, mediaId: number): Promise<void> {
+  // Unmonitor first so *arr doesn't trigger a search after the file is gone.
+  const path = instance.type === 'radarr' ? `/api/v3/movie/${mediaId}` : `/api/v3/series/${mediaId}`
+  await arrFetch(instance, path, {
+    method: 'PUT',
+    body: JSON.stringify({ monitored: false }),
+  })
+
   if (instance.type === 'radarr') {
     // Radarr: delete the single movieFile by its id.
     const movie = await arrGetMedia(instance, mediaId)
@@ -91,6 +99,15 @@ export async function arrDeleteFiles(instance: ArrInstance, mediaId: number): Pr
       await arrFetch(instance, `/api/v3/episodeFile/${f.id}`, { method: 'DELETE' })
     }
   }
+}
+
+// Re-monitor a movie/series (called after Restore so *arr tracks it again).
+export async function arrMonitor(instance: ArrInstance, mediaId: number): Promise<void> {
+  const path = instance.type === 'radarr' ? `/api/v3/movie/${mediaId}` : `/api/v3/series/${mediaId}`
+  await arrFetch(instance, path, {
+    method: 'PUT',
+    body: JSON.stringify({ monitored: true }),
+  })
 }
 
 export async function arrRefresh(instance: ArrInstance, mediaId: number): Promise<void> {

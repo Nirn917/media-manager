@@ -1,5 +1,5 @@
 import { spawnRcloneCopy, parseRcloneLog } from '~/server/lib/rclone'
-import { arrRefresh, type ArrInstance } from '~/server/lib/arr'
+import { arrRefresh, arrMonitor, type ArrInstance } from '~/server/lib/arr'
 import { getAllSettings } from '~/server/lib/settings'
 import { resolveArrMedia, createJob, finishJob, updateJobProgress, runningJobForPath } from '~/server/lib/jobs'
 import { registerRestoreChild, markRestoreDone, getRestoreChild } from '~/server/lib/restore-registry'
@@ -37,11 +37,13 @@ function startRestoreJob(
     markRestoreDone(jobId, code === 0 ? undefined : `rclone exit ${code}`)
     if (code === 0) {
       // Ask *arr to rescan so the media is re-marked as "possessed".
+      // Also re-monitor so *arr tracks future changes after Archive unmonitored it.
       try {
         const { radarr, sonarr } = await getAllSettings()
         const inst: ArrInstance = meta.arrType === 'radarr'
           ? { ...radarr!, type: 'radarr' }
           : { ...sonarr!, type: 'sonarr' }
+        await arrMonitor(inst, meta.mediaId)
         await arrRefresh(inst, meta.mediaId)
       } catch (err) {
         // eslint-disable-next-line no-console
