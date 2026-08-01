@@ -259,9 +259,17 @@ Enable WAL mode on connect: `PRAGMA journal_mode=WAL;`
 
 | Var | Description |
 |-----|-------------|
-| `APP_MASTER_KEY` | 32 random bytes (base64) used to encrypt settings in DB and sign auth cookies |
+| `APP_MASTER_KEY` | 32 random bytes (base64) used to encrypt settings in DB and derive session-cookie keys |
 
 All other config (Jellyfin URL, Radarr/Sonarr API keys) is stored in the `settings` table (encrypted), not in env vars — so the user can change them via the Settings page without redeploying.
+
+### Security considerations
+
+The Jellyfin admin password and the Radarr/Sonarr API keys are stored **reversibly encrypted** in the SQLite database (AES-256-GCM with `APP_MASTER_KEY`). This is a deliberate functional requirement: the app must present these credentials to the upstream services on every request, so a one-way hash is not possible. Because of this, both `APP_MASTER_KEY` (in the `media-manager-secrets` Secret) and the SQLite database (in the `media-manager-config` PVC) must be treated as highly sensitive:
+
+- Restrict Kubernetes RBAC so that only administrators can read `media-manager-secrets` or access a shell in the `media-manager` pod.
+- Do not expose the `media-manager-config` PVC snapshots/backups to users or systems that do not need them.
+- Rotate `APP_MASTER_KEY` only with a migration plan, because changing the key invalidates existing encrypted settings and session cookies.
 
 ---
 
