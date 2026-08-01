@@ -1,7 +1,6 @@
 // Jellyfin REST client. Handles AuthenticateByName, Users/Me, Users/{id}/Items.
 import type { H3Event } from 'h3'
-import { getCookie } from 'h3'
-import { verify } from './crypto'
+import { readSession } from './auth'
 
 const DEVICE_ID = 'media-manager-001'
 const CLIENT = 'media-manager'
@@ -113,14 +112,8 @@ function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`
 }
 
-// Helper for Nitro routes to read the user token from the signed cookie.
-// We use our own HMAC scheme (see server/lib/crypto.ts) instead of h3's
-// readSignedCookie so the same APP_MASTER_KEY signs both cookies and settings.
+// Helper for Nitro routes to read the user token from the encrypted session cookie.
+// Delegates to readSession() so cookie handling lives in one place.
 export function getCookieToken(event: H3Event): string | null {
-  const raw = getCookie(event, 'mm_session')
-  if (!raw) return null
-  const verified = verify(raw)
-  if (!verified) return null
-  const [token] = verified.split('|')
-  return token || null
+  return readSession(event)?.token ?? null
 }

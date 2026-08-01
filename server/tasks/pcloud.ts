@@ -12,6 +12,8 @@ export default defineTask({
   meta: { name: 'pcloud', description: 'Reindex pCloud via rclone lsf' },
   async run(): Promise<{ result: { count: number; log: string[]; success: boolean } }> {
     const log: string[] = []
+    const started = Date.now()
+    console.log('[cron] pcloud:index started')
     try {
       log.push('running rclone lsjson…')
       const entries = await rcloneLsf(rcloneRemoteBase())
@@ -46,11 +48,15 @@ export default defineTask({
         throw err
       }
 
+      const elapsed = ((Date.now() - started) / 1000).toFixed(1)
       log.push(`indexed ${rows.length} entries`)
+      console.log(`[cron] pcloud:index done - ${rows.length} entries in ${elapsed}s`)
       return { result: { count: rows.length, log, success: true } }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      const elapsed = ((Date.now() - started) / 1000).toFixed(1)
       log.push(`failed: ${msg}`)
+      console.error(`[cron] pcloud:index failed in ${elapsed}s - ${msg}`)
       return { result: { count: 0, log, success: false } }
     }
   },

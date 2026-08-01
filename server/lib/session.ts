@@ -1,7 +1,7 @@
-// Session cookie format (signed with APP_MASTER_KEY via server/lib/crypto.sign):
-//   mm_session = sign("<token>|<userId>|<username>|<isAdmin|0|1>")
-// All fields are pipe-delimited so verify() can detect tampering of the whole
-// payload at once.
+// Session cookie format (encrypted with APP_MASTER_KEY via server/lib/crypto.encrypt):
+//   mm_session = encrypt("<token>|<userId>|<username>|<isAdmin|0|1>")
+// All fields are pipe-delimited. AES-256-GCM encryption provides both
+// confidentiality and tamper detection for the whole payload.
 export type SessionPayload = {
   token: string
   userId: string

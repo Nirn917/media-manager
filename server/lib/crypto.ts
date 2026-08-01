@@ -1,7 +1,25 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  hkdfSync,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto'
 
-// AES-256-GCM key derived from APP_MASTER_KEY (base64 of 32 random bytes,
-// so the raw key is exactly 32 bytes after base64 decode).
+// APP_MASTER_KEY is the single env-provided secret. We do NOT use it directly
+// for cryptography; instead we derive two independent subkeys via HKDF-SHA256.
+// This follows the key-separation best practice: one key for AES-GCM, another
+// for HMAC. Both derived keys are 32 bytes.
+//
+// IMPORTANT: changing the derivation scheme invalidates any blobs encrypted or
+// signed with the previous raw key. That means:
+//   - existing session cookies become invalid (users must log in again)
+//   - existing encrypted settings rows become unreadable until re-saved
+// Coordinate deployments so users expect a forced re-login, and run the setup
+// wizard / Settings page to re-encrypt stored service credentials.
+type KeyPurpose = 'encrypt' | 'sign'
+
 function masterKey(): Buffer {
   const raw = process.env.APP_MASTER_KEY
   if (!raw) throw new Error('APP_MASTER_KEY env var is required')
@@ -12,10 +30,15 @@ function masterKey(): Buffer {
   return key
 }
 
+function deriveKey(purpose: KeyPurpose): Buffer {
+  const master = masterKey()
+  return Buffer.from(hkdfSync('sha256', master, Buffer.alloc(0), Buffer.from(purpose), 32))
+}
+
 // Encrypted blob format: base64(iv)[:base64(ciphertext)[:base64(authTag)
 // All concatenated with '.' -> single portable string for SQLite TEXT column.
 export function encrypt(plaintext: string): string {
-  const key = masterKey()
+  const key = deriveKey('encrypt')
   const iv = randomBytes(12) // 96-bit IV is the GCM standard
   const cipher = createCipheriv('aes-256-gcm', key, iv)
   const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
@@ -24,7 +47,7 @@ export function encrypt(plaintext: string): string {
 }
 
 export function decrypt(blob: string): string {
-  const key = masterKey()
+  const key = deriveKey('encrypt')
   const [ivB64, encB64, tagB64] = blob.split('.')
   if (!ivB64 || !encB64 || !tagB64) throw new Error('invalid ciphertext blob')
   const iv = Buffer.from(ivB64, 'base64')
@@ -38,7 +61,7 @@ export function decrypt(blob: string): string {
 
 // Sign the auth cookie so tampering is detectable. Truncated HMAC-SHA256.
 export function sign(value: string): string {
-  const key = masterKey()
+  const key = deriveKey('sign')
   const mac = createHmac('sha256', key).update(value).digest('base64url')
   return `${value}.${mac}`
 }
@@ -48,7 +71,7 @@ export function verify(signed: string): string | null {
   const idx = signed.lastIndexOf('.')
   const value = signed.slice(0, idx)
   const mac = signed.slice(idx + 1)
-  const expected = createHmac('sha256', masterKey()).update(value).digest('base64url')
+  const expected = createHmac('sha256', deriveKey('sign')).update(value).digest('base64url')
   // Constant-time compare.
   if (mac.length !== expected.length) return null
   if (!timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) return null

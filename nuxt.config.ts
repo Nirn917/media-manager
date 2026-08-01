@@ -24,7 +24,9 @@ export default defineNuxtConfig({
     // Long-running rclone jobs + SSE need generous timeout.
     timing: false,
     routeRules: {
-      '/api/restore/**/events': { cache: { maxAge: 0 }, cors: true },
+      // SSE progress stream. Disable caching; no CORS is needed because the
+      // frontend and API are served from the same origin.
+      '/api/restore/**/events': { cache: { maxAge: 0 } },
     },
     scheduledTasks: {
       // Hourly cron jobs, internal to Nitro (no external scheduler needed).

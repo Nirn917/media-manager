@@ -1,5 +1,5 @@
 import { jellyfinAuthenticate, jellyfinListUsers } from '~/server/lib/jellyfin'
-import { arrSystemStatus } from '~/server/lib/arr'
+import { assertSafeTargetUrlResolved, UnsafeUrlError } from '~/server/lib/url-safety'
 
 // POST /api/setup/test/jellyfin
 // Body: { url, username, password }
@@ -12,6 +12,14 @@ export default defineEventHandler(async (event) => {
   if (!url || !username) {
     throw createError({ statusCode: 400, statusMessage: 'url + username required' })
   }
+
+  try {
+    await assertSafeTargetUrlResolved(url)
+  } catch (err) {
+    const message = err instanceof UnsafeUrlError ? err.message : 'invalid target URL'
+    throw createError({ statusCode: 400, statusMessage: message })
+  }
+
   try {
     const auth = await jellyfinAuthenticate(url, username, password)
     // List users so the wizard can pick the Jellyfin admin (used for the index cron).
